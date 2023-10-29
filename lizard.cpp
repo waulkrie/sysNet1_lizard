@@ -24,7 +24,8 @@
 #include <iostream>
 #include <thread>
 #include <mutex>
-#include <vector>
+#include <vector>       
+#include <semaphore.h>
 
 
 using namespace std;
@@ -118,9 +119,13 @@ class Cat {
 	
 	int       _id;        // the Id of the cat
 	thread*   _catThread; // the thread simulating the cat
+	sem_t*  _sidewalk_sem; 		// AB - semaphore for sidewalk
+	mutex*  _running_mutex; 	// AB - mutex for running var
+	mutex*  _monkeyGrass2Sago_mtx;			// AB - mutex for numCrossingMonkeyGrass2Sago
+	mutex*  _sago2MonkeyGrass_mtx;			// AB - mutex for numCrossingSago2MonkeyGrass
 	
 	public:
-		Cat (int id);
+		Cat (int id, sem_t*, mutex*, mutex*, mutex*); // AB - pass in pointers
 		int getId();
 		void run();
 		void wait();
@@ -136,9 +141,14 @@ class Cat {
  *
  * @param id - the Id of the cat 
  */
-Cat::Cat (int id)
+Cat::Cat (int id, sem_t* sem, mutex* mtx, mutex* sago_mtx, mutex* monkey_mtx)
 {
 	_id = id;
+	this->_sidewalk_sem = sem; 					// AB - set sidewalk semaphore
+	this->_running_mutex = mtx; 				// AB - set running mutex
+	this->_monkeyGrass2Sago_mtx = monkey_mtx; 	// AB - set monkeyGrass2Sago mutex
+	this->_sago2MonkeyGrass_mtx = sago_mtx; 	// AB - set sago2MonkeyGrass mutex	
+
 }
 
 /**
@@ -160,6 +170,7 @@ int Cat::getId()
  void Cat::run() 
  {
 	 // launch the thread to simulate the cat's behavior	 
+    this->_catThread = new thread ( catThread, this); 		// AB - init thread on heap
 	 
  }
  
@@ -171,6 +182,7 @@ int Cat::getId()
  void Cat::wait()
  {
 	 // wait for the thread to terminate
+	 this->_catThread->join(); 		// AB - wait for the thread
  }
  
  
@@ -223,12 +235,25 @@ void Cat::catThread (Cat *aCat)
 		cout << flush;
     }
 
+	// AB - wait for the world to start
+	aCat->_running_mutex->lock(); 		// AB - lock running var
+	while(running == 0)
+	{
+		aCat->_running_mutex->unlock(); 		// AB - unlock running var
+		usleep(1 * 1000);						// AB - sleep for 1ms
+		aCat->_running_mutex->lock(); 		// AB - lock running var
+	}
+	aCat->_running_mutex->unlock(); 		// AB - unlock running var
+
+	aCat->_running_mutex->lock(); 		// AB - lock running var
 	while(running)
     {
+		aCat->_running_mutex->unlock(); 		// AB - unlock running var
 		aCat->sleepNow();
 
 
-
+		aCat->_sago2MonkeyGrass_mtx->lock(); 		// AB - lock
+		aCat->_monkeyGrass2Sago_mtx->lock(); 		// AB - lock
 		/*
 	     * Check for too many lizards crossing
 	     */
@@ -237,7 +262,12 @@ void Cat::catThread (Cat *aCat)
 		  cout << "\tThe cats are happy - they have toys.\n";
 		  exit( -1 );
 		}
+		aCat->_sago2MonkeyGrass_mtx->unlock(); 		// AB - unlock
+		aCat->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
+		aCat->_running_mutex->lock(); 		// AB - lock running var
+
     }
+	aCat->_running_mutex->unlock(); 		// AB - unlock running var
 }
 
  
@@ -246,8 +276,13 @@ class Lizard {
 	int     _id;      // the Id of the lizard
 	thread* _aLizard; // the thread simulating the lizard
 
+	sem_t*  _sidewalk_sem; 					// AB - semaphore for sidewalk
+	mutex*  _running_mutex; 				// AB - mutex for running var
+	mutex*  _monkeyGrass2Sago_mtx;			// AB - mutex for numCrossingMonkeyGrass2Sago
+	mutex*  _sago2MonkeyGrass_mtx;			// AB - mutex for numCrossingSago2MonkeyGrass
+
 	public:
-		Lizard(int id);
+		Lizard(int id, sem_t*, mutex*, mutex*, mutex*);
 		int getId();
         void run();
         void wait();
@@ -272,9 +307,13 @@ class Lizard {
  *
  * @param id - the Id of the lizard 
  */
-Lizard::Lizard (int id)
+Lizard::Lizard (int id, sem_t* sem, mutex* mtx, mutex* sago_mtx, mutex* monkey_mtx)
 {
 	_id = id;
+	this->_sidewalk_sem = sem; 					// AB - set sidewalk semaphore
+	this->_running_mutex = mtx; 				// AB - set running mutex
+	this->_monkeyGrass2Sago_mtx = monkey_mtx; 	// AB - set monkeyGrass2Sago mutex
+	this->_sago2MonkeyGrass_mtx = sago_mtx; 	// AB - set sago2MonkeyGrass mutex	
 }
 
 /**
@@ -295,7 +334,7 @@ int Lizard::getId()
  void Lizard::run() 
  {
 	 // launch the thread to simulate the lizard's behavior
-    _aLizard = new thread ( lizardThread, this); 
+    _aLizard = new thread ( lizardThread, this);
  }
  
  /**
@@ -361,14 +400,16 @@ void Lizard::sago2MonkeyGrassIsSafe()
 		cout << flush;
     }
 
-	
+
+	sem_wait(this->_sidewalk_sem); 		// AB - wait on sidewalk semaphore
 
 
 	if (debug)
     {
 		cout << "[" << _id << "] thinks  sago -> monkey grass  is safe" << endl;
 		cout << flush;
-    }
+    }   
+	
 }
 
 
@@ -390,7 +431,9 @@ void Lizard::crossSago2MonkeyGrass()
 	/*
 	 * One more crossing this way
 	 */
+	this->_sago2MonkeyGrass_mtx->lock(); 		// AB - lock 
 	numCrossingSago2MonkeyGrass++;
+	this->_sago2MonkeyGrass_mtx->unlock(); 		// AB - unlock 
 
 	/*
      * Check for lizards cross both ways
@@ -412,7 +455,9 @@ void Lizard::crossSago2MonkeyGrass()
     /*
      * That one seems to have made it
      */
+	this->_sago2MonkeyGrass_mtx->lock(); 		// AB - lock 
     numCrossingSago2MonkeyGrass--;
+	this->_sago2MonkeyGrass_mtx->unlock(); 		// AB - unlock 
 }
 
 
@@ -423,6 +468,7 @@ void Lizard::crossSago2MonkeyGrass()
  */
 void Lizard::madeIt2MonkeyGrass()
 {
+	sem_post(this->_sidewalk_sem); 				// AB - release semaphore
 	/*
      * Whew, made it across
      */
@@ -485,7 +531,7 @@ void Lizard::monkeyGrass2SagoIsSafe()
     }
 
 
-
+	sem_wait(this->_sidewalk_sem); 		// AB - wait on sidewalk semaphore
 
 
 	if (debug)
@@ -493,6 +539,7 @@ void Lizard::monkeyGrass2SagoIsSafe()
 		cout << "[" << _id << "] thinks  monkey grass -> sago  is safe" << endl;
 		cout << flush;
     }
+	
 }
 
 
@@ -514,7 +561,9 @@ void Lizard::crossMonkeyGrass2Sago()
     /*
      * One more crossing this way
      */
+	this->_monkeyGrass2Sago_mtx->lock(); 		// AB - lock 
 	numCrossingMonkeyGrass2Sago++;
+	this->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
 
   
     /*
@@ -536,7 +585,9 @@ void Lizard::crossMonkeyGrass2Sago()
 	/*
      * That one seems to have made it
      */
+	this->_monkeyGrass2Sago_mtx->lock(); 		// AB - lock 
 	numCrossingMonkeyGrass2Sago--;
+	this->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
 }
 
 
@@ -548,6 +599,7 @@ void Lizard::crossMonkeyGrass2Sago()
  */
 void Lizard::madeIt2Sago()
 {
+	sem_post(this->_sidewalk_sem);		// AB - release semaphore
 	/*
      * Whew, made it across
      */
@@ -577,8 +629,21 @@ void Lizard::lizardThread(Lizard *aLizard)
       cout << flush;
     }
 
+	// AB - wait for the world to start
+	aLizard->_running_mutex->lock(); 		// AB - lock running var
+	while(running == 0)
+	{
+		aLizard->_running_mutex->unlock(); 		// AB - unlock running var
+		usleep(1 * 1000);						// AB - sleep for 1ms
+		aLizard->_running_mutex->lock(); 		// AB - lock running var
+	}
+	aLizard->_running_mutex->unlock(); 		// AB - unlock running var
+
+	
+	aLizard->_running_mutex->lock(); 		// AB - lock running var
 	while(running)
     {
+		aLizard->_running_mutex->unlock(); 		// AB - unlock running var
       /* 
        * Follow the algorithm given in the assignment
        * using calls to the functions declared above.
@@ -587,24 +652,19 @@ void Lizard::lizardThread(Lizard *aLizard)
        * are already completed - see the comments.
        */
 
+		aLizard->sago2MonkeyGrassIsSafe();
+		aLizard->crossSago2MonkeyGrass();
+		aLizard->madeIt2MonkeyGrass();
+		aLizard->eat();
 
+		aLizard->monkeyGrass2SagoIsSafe();
+		aLizard->crossMonkeyGrass2Sago();
+		aLizard->madeIt2Sago();
+		aLizard->sleepNow();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+		aLizard->_running_mutex->lock(); 		// AB - lock running var
     }
+	aLizard->_running_mutex->unlock(); 		// AB - unlock running var
 
 }
  
@@ -624,17 +684,17 @@ int main(int argc, char **argv)
 	/*
 	 * Declare local variables
      */
-
-
-
+	sem_t sidewalk_sem; 						// AB - limit amount of lizards on sidewalk
+	mutex running_mtx; 						// AB - mutex for running var
+	mutex sago2MonkeyGrass_mtx; 				// AB - mutex for numCrossingSago2MonkeyGrass
+	mutex monkeyGrass2Sago_mtx; 				// AB - mutex for numCrossingMonkeyGrass2Sago
 
 	/*
      * Check for the debugging flag (-d)
      */
 	debug = 0;
-	if (argc > 1)
-		if (strncmp(argv[1], "-d", 2) == 0)
-			debug = 1;
+	if (argc > 1 && argv[1] != NULL && (strncmp(argv[1], "-d", 2) == 0))
+    debug = 1;
 
 
 	/*
@@ -654,7 +714,7 @@ int main(int argc, char **argv)
 	/*
      * Initialize locks and/or semaphores
      */
-
+	sem_init(&sidewalk_sem, 0, MAX_LIZARD_CROSSING); 		// AB - init sidewalk semaphore
 
 
 
@@ -663,14 +723,18 @@ int main(int argc, char **argv)
      */
     vector<Lizard*> allLizards;
     for (int i=0; i < NUM_LIZARDS; i++) {
-	    allLizards.push_back(new Lizard(i));
+	    allLizards.push_back(new Lizard(i, &sidewalk_sem, &running_mtx, &sago2MonkeyGrass_mtx, &monkeyGrass2Sago_mtx));
     }    
     
 
     /*
      * Create NUM_CATS cat threads
      */
-	 
+    vector<Cat*> allCats; 		// AB - create vector of cat threads
+    for (int i=0; i < NUM_CATS; i++) {
+	    allCats.push_back(new Cat(i, &sidewalk_sem, &running_mtx, &sago2MonkeyGrass_mtx, &monkeyGrass2Sago_mtx));
+    }    
+    
 
 	/*
 	 * Run NUM_LIZARDS and NUM_CATS threads
@@ -678,22 +742,35 @@ int main(int argc, char **argv)
     for (int i=0; i < NUM_LIZARDS; i++) {
         allLizards[i]->run();
     }
+    for (int i=0; i < NUM_CATS; i++) {
+        allCats[i]->run();
+    }
 
 	/*
      * Now let the world run for a while
      */
+	running_mtx.lock(); 		// AB - lock running var
+	running = 1;
+	running_mtx.unlock(); 	// AB - unlock running var
 	sleep( WORLDEND );
 
 
 	/*
      * That's it - the end of the world
      */
+	running_mtx.lock(); 		// AB - lock running var
 	running = 0;
-
+	running_mtx.unlock(); 	// AB - unlock running var
 
     /*
      * Wait until all threads terminate
      */
+	for (int i=0; i < NUM_LIZARDS; i++) { 		// AB - wait on all threads
+		allLizards[i]->wait();
+	}
+	for (int i=0; i < NUM_CATS; i++) {
+		allCats[i]->wait();
+	}
 
 
 
@@ -703,13 +780,19 @@ int main(int argc, char **argv)
 	/*
      * Delete the locks and semaphores
      */
-	 
+	 sem_destroy(&sidewalk_sem); 		// AB - destroy sidewalk semaphore
+
 	 
 	 
 	/*
 	 * Delete all cat and lizard objects
 	 */
- 
+	for (int i=0; i < NUM_LIZARDS; i++) { 		// AB - delete all threads
+		delete allLizards[i];
+	}
+	for (int i=0; i < NUM_CATS; i++) {
+		delete allCats[i];
+	}
 
 
 
