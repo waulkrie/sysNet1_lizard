@@ -26,6 +26,7 @@
 #include <mutex>
 #include <vector>       
 #include <semaphore.h>
+#include <condition_variable>
 
 
 using namespace std;
@@ -54,22 +55,22 @@ using namespace std;
  * be simulated.  
  * Try 30 for development and 120 for more thorough testing.
  */
-#define WORLDEND             30
+#define WORLDEND             60 * 30
 
 /*
  * Number of lizard threads to create
  */
-#define NUM_LIZARDS          20
+#define NUM_LIZARDS          2000
 
 /*
  * Number of cat threads to create
  */
-#define NUM_CATS             2
+#define NUM_CATS             200
 
 /*	
  * Maximum lizards crossing at once before alerting cats
  */
-#define MAX_LIZARD_CROSSING  4
+#define MAX_LIZARD_CROSSING  400
 
 /*
  * Maximum seconds for a lizard to sleep
@@ -123,9 +124,10 @@ class Cat {
 	mutex*  _running_mutex; 	// AB - mutex for running var
 	mutex*  _monkeyGrass2Sago_mtx;			// AB - mutex for numCrossingMonkeyGrass2Sago
 	mutex*  _sago2MonkeyGrass_mtx;			// AB - mutex for numCrossingSago2MonkeyGrass
+	condition_variable* _running_cv; 		// AB - condition variable for running var
 	
 	public:
-		Cat (int id, sem_t*, mutex*, mutex*, mutex*); // AB - pass in pointers
+		Cat (int id, sem_t*, mutex*, mutex*, mutex*, condition_variable*); // AB - pass in pointers
 		int getId();
 		void run();
 		void wait();
@@ -141,13 +143,14 @@ class Cat {
  *
  * @param id - the Id of the cat 
  */
-Cat::Cat (int id, sem_t* sem, mutex* mtx, mutex* sago_mtx, mutex* monkey_mtx)
+Cat::Cat (int id, sem_t* sem, mutex* mtx, mutex* sago_mtx, mutex* monkey_mtx, condition_variable* cv)
 {
 	_id = id;
 	this->_sidewalk_sem = sem; 					// AB - set sidewalk semaphore
 	this->_running_mutex = mtx; 				// AB - set running mutex
 	this->_monkeyGrass2Sago_mtx = monkey_mtx; 	// AB - set monkeyGrass2Sago mutex
 	this->_sago2MonkeyGrass_mtx = sago_mtx; 	// AB - set sago2MonkeyGrass mutex	
+	this->_running_cv = cv; 					// AB - set running condition variable
 
 }
 
@@ -236,17 +239,11 @@ void Cat::catThread (Cat *aCat)
     }
 
 	// AB - wait for the world to start
-	aCat->_running_mutex->lock(); 		// AB - lock running var
-	while(running == 0)
-	{
-		aCat->_running_mutex->unlock(); 		// AB - unlock running var
-		usleep(1 * 1000);						// AB - sleep for 1ms
-		aCat->_running_mutex->lock(); 		// AB - lock running var
-	}
-	aCat->_running_mutex->unlock(); 		// AB - unlock running var
+	unique_lock<mutex> lock(*aCat->_running_mutex); 		// AB - lock running var
+	aCat->_running_cv->wait( lock); 		// AB - wait for running var
 
-	aCat->_running_mutex->lock(); 		// AB - lock running var
-	while(running)
+	lock.lock(); 		// AB - lock running var
+	while(aCat->_running_cv->wait_for( lock, std::chrono::milliseconds(1)) == std::cv_status::timeout)
     {
 		aCat->_running_mutex->unlock(); 		// AB - unlock running var
 		aCat->sleepNow();
@@ -264,10 +261,9 @@ void Cat::catThread (Cat *aCat)
 		}
 		aCat->_sago2MonkeyGrass_mtx->unlock(); 		// AB - unlock
 		aCat->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
-		aCat->_running_mutex->lock(); 		// AB - lock running var
+		lock.lock(); 		// AB - lock running var
 
     }
-	aCat->_running_mutex->unlock(); 		// AB - unlock running var
 }
 
  
@@ -280,9 +276,10 @@ class Lizard {
 	mutex*  _running_mutex; 				// AB - mutex for running var
 	mutex*  _monkeyGrass2Sago_mtx;			// AB - mutex for numCrossingMonkeyGrass2Sago
 	mutex*  _sago2MonkeyGrass_mtx;			// AB - mutex for numCrossingSago2MonkeyGrass
+	condition_variable* _running_cv; 		// AB - condition variable for running var
 
 	public:
-		Lizard(int id, sem_t*, mutex*, mutex*, mutex*);
+		Lizard(int id, sem_t*, mutex*, mutex*, mutex*, condition_variable*);
 		int getId();
         void run();
         void wait();
@@ -307,13 +304,15 @@ class Lizard {
  *
  * @param id - the Id of the lizard 
  */
-Lizard::Lizard (int id, sem_t* sem, mutex* mtx, mutex* sago_mtx, mutex* monkey_mtx)
+Lizard::Lizard (int id, sem_t* sem, mutex* mtx, mutex* sago_mtx, mutex* monkey_mtx, condition_variable* cv)
 {
 	_id = id;
 	this->_sidewalk_sem = sem; 					// AB - set sidewalk semaphore
 	this->_running_mutex = mtx; 				// AB - set running mutex
 	this->_monkeyGrass2Sago_mtx = monkey_mtx; 	// AB - set monkeyGrass2Sago mutex
-	this->_sago2MonkeyGrass_mtx = sago_mtx; 	// AB - set sago2MonkeyGrass mutex	
+	this->_sago2MonkeyGrass_mtx = sago_mtx; 	// AB - set sago2MonkeyGrass mutex
+	this->_running_cv = cv; 					// AB - set running condition variable
+	
 }
 
 /**
@@ -349,11 +348,6 @@ int Lizard::getId()
         _aLizard->join();
     } 
  }
- 
-
-
-
-
 
 /**
  * Simulate a lizard sleeping for a random amount of time
@@ -381,9 +375,6 @@ void Lizard::sleepNow()
     }
 }
 
-
-
- 
 /**
  *
  * Returns when it is safe for this lizard to cross from the sago
@@ -477,13 +468,7 @@ void Lizard::madeIt2MonkeyGrass()
 		cout << "[" << _id << "] made the  sago -> monkey grass  crossing" << endl;
 		cout << flush;
     }
-
-
-
-
-
 }
-
 
 /**
  * Simulate a lizard eating for a random amount of time
@@ -514,7 +499,6 @@ void Lizard::eat()
     }
 }
 
-
 /**
  * Returns when it is safe for this lizard to cross from the monkey
  * grass to the sago.   Should use some synchronization 
@@ -541,8 +525,6 @@ void Lizard::monkeyGrass2SagoIsSafe()
     }
 	
 }
-
-
 
 /**
  * Delays for 1 second to simulate crossing from the monkey
@@ -589,7 +571,6 @@ void Lizard::crossMonkeyGrass2Sago()
 	numCrossingMonkeyGrass2Sago--;
 	this->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
 }
-
 
 /**
  *
@@ -667,9 +648,6 @@ void Lizard::lizardThread(Lizard *aLizard)
 	aLizard->_running_mutex->unlock(); 		// AB - unlock running var
 
 }
- 
-
-
 
 /*
  * main()
@@ -685,7 +663,7 @@ int main(int argc, char **argv)
 	 * Declare local variables
      */
 	sem_t sidewalk_sem; 						// AB - limit amount of lizards on sidewalk
-	mutex running_mtx; 						// AB - mutex for running var
+	mutex running_mtx; 							// AB - mutex for running var
 	mutex sago2MonkeyGrass_mtx; 				// AB - mutex for numCrossingSago2MonkeyGrass
 	mutex monkeyGrass2Sago_mtx; 				// AB - mutex for numCrossingMonkeyGrass2Sago
 
@@ -749,6 +727,7 @@ int main(int argc, char **argv)
 	/*
      * Now let the world run for a while
      */
+	cout << "world running" << endl;
 	running_mtx.lock(); 		// AB - lock running var
 	running = 1;
 	running_mtx.unlock(); 	// AB - unlock running var
@@ -761,7 +740,7 @@ int main(int argc, char **argv)
 	running_mtx.lock(); 		// AB - lock running var
 	running = 0;
 	running_mtx.unlock(); 	// AB - unlock running var
-
+	cout << "end of the world" << endl;
     /*
      * Wait until all threads terminate
      */
@@ -772,17 +751,11 @@ int main(int argc, char **argv)
 		allCats[i]->wait();
 	}
 
-
-
-
-
-
 	/*
      * Delete the locks and semaphores
      */
 	 sem_destroy(&sidewalk_sem); 		// AB - destroy sidewalk semaphore
 
-	 
 	 
 	/*
 	 * Delete all cat and lizard objects
