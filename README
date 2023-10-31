@@ -1,7 +1,14 @@
 To compile the program run 'make'  
 To clean compilation objects run 'make clean'  
-To run the program 
-./mt-collatz <N> <num_threads> [-nolock]
+To run the program  
+./lizard [-d]  
 
-The biggest hurdle we had in completing this project was not realizing that one worker thread  
-continuously got stuck trying to process 0 at the beginning of the subroutine.
+The objective of this project is to create a shared mutually exclusive resource that is accessed by multiple threads. 
+There are N lizard threads and M cat threads, the lizard threads must limit the occupancy of the sidewalk or else 
+the M cat threads will wake up and terminate the program.  
+
+  - Do not allow too many lizards to cross the driveway at once  
+  - Do not use busy waits to control the lizards  
+  - Allow the maximum possible number of lizards to cross simultaneously  
+
+Extra credit looks a little harder than I originally thought  
