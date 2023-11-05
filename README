@@ -11,4 +11,6 @@ the M cat threads will wake up and terminate the program.
   - Do not use busy waits to control the lizards  
   - Allow the maximum possible number of lizards to cross simultaneously  
 
-Extra credit looks a little harder than I originally thought  
+To compile the extra credit lizardUni run 'make -f extra.mk'
+To run the extra credit lizardUni
+./lizardUni [-d]
