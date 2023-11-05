@@ -317,8 +317,8 @@ Lizard::Lizard (int id, sem_t* sem, mutex* mtx, mutex* sago_mtx, mutex* monkey_m
 	this->_running_mutex = mtx; 				// AB - set running mutex
 	this->_monkeyGrass2Sago_mtx = monkey_mtx; 	// AB - set monkeyGrass2Sago mutex
 	this->_sago2MonkeyGrass_mtx = sago_mtx; 	// AB - set sago2MonkeyGrass mutex	
-	this->ok_cross_2_sago = sago_cross;
-	this->ok_cross_2_grass = grass_cross;
+	this->ok_cross_2_sago = sago_cross;			// DG - set ok_cross_2_sago condition var
+	this->ok_cross_2_grass = grass_cross;		// DG - set ok_cross_2_grass condition var
 }
 
 /**
@@ -404,11 +404,11 @@ void Lizard::sago2MonkeyGrassIsSafe()
 		cout << "[" << _id << "] checking  sago -> monkey grass" << endl;
 		cout << flush;
     }
-    unique_lock<mutex> wrapper(lock);
+    unique_lock<mutex> wrapper(lock);		
 	this->_monkeyGrass2Sago_mtx->lock();
     if(numCrossingMonkeyGrass2Sago != 0){
 		this->_monkeyGrass2Sago_mtx->unlock();
-	    ok_cross_2_grass->wait(wrapper);  //DG - blocks thread if there is traffic in the opposite Direction
+	    ok_cross_2_grass->wait(wrapper);  	//DG - blocks thread if there is traffic in the opposite Direction
 		
     }else this->_monkeyGrass2Sago_mtx->unlock();
 
@@ -469,7 +469,7 @@ void Lizard::crossSago2MonkeyGrass()
      */
 	this->_sago2MonkeyGrass_mtx->lock(); 		// AB - lock 
     numCrossingSago2MonkeyGrass--;
-    if(numCrossingSago2MonkeyGrass == 0){
+    if(numCrossingSago2MonkeyGrass == 0){		// DG - releases blocked threads if there is no traffic on sidewalk
         ok_cross_2_sago->notify_all();
     }
 	this->_sago2MonkeyGrass_mtx->unlock(); 		// AB - unlock 
@@ -549,7 +549,7 @@ void Lizard::monkeyGrass2SagoIsSafe()
     unique_lock<mutex> wrapper(lock);
 	this->_sago2MonkeyGrass_mtx->lock();
     if(numCrossingSago2MonkeyGrass != 0){
-		this->_sago2MonkeyGrass_mtx->unlock();
+		this->_sago2MonkeyGrass_mtx->unlock();	//DG - blocks threads if there is traffic in the opposite direction
         ok_cross_2_sago->wait(wrapper);
     }else this->_sago2MonkeyGrass_mtx->unlock();
 
@@ -610,7 +610,7 @@ void Lizard::crossMonkeyGrass2Sago()
 	this->_monkeyGrass2Sago_mtx->lock(); 		// AB - lock 
 	numCrossingMonkeyGrass2Sago--;
     if(numCrossingMonkeyGrass2Sago == 0){
-        ok_cross_2_grass->notify_all();
+        ok_cross_2_grass->notify_all();			// DG - release threads if there is no traffic on sidewalk
     }
 	this->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
 }
@@ -709,11 +709,11 @@ int main(int argc, char **argv)
 	 * Declare local variables
      */
 	sem_t sidewalk_sem; 						// AB - limit amount of lizards on sidewalk
-	mutex running_mtx; 						// AB - mutex for running var
+	mutex running_mtx; 							// AB - mutex for running var
 	mutex sago2MonkeyGrass_mtx; 				// AB - mutex for numCrossingSago2MonkeyGrass
 	mutex monkeyGrass2Sago_mtx; 				// AB - mutex for numCrossingMonkeyGrass2Sago
-	condition_variable sago_cross;
-	condition_variable grass_cross;
+	condition_variable sago_cross;				// DG - conditional var for crossing sidewalk to sago
+	condition_variable grass_cross;				// DG - conditional var for crossing sidewalk to monkey grass
 
 	/*
      * Check for the debugging flag (-d)
@@ -776,9 +776,9 @@ int main(int argc, char **argv)
 	/*
      * Now let the world run for a while
      */
-	running_mtx.lock(); 		// AB - lock running var
+	running_mtx.lock(); 		// DG - lock running var
 	running = 1;
-	running_mtx.unlock(); 	// AB - unlock running var
+	running_mtx.unlock(); 	// DG - unlock running var
 	sleep( WORLDEND );
 
 
@@ -807,13 +807,13 @@ int main(int argc, char **argv)
 	/*
      * Delete the locks and semaphores
      */
-	 sem_destroy(&sidewalk_sem); 		// AB - destroy sidewalk semaphore
+	 sem_destroy(&sidewalk_sem); 		// DG - destroy sidewalk semaphore
 	 
 	 
 	/*
 	 * Delete all cat and lizard objects
 	 */
-	for (int i=0; i < NUM_LIZARDS; i++) { 		// AB - delete all threads
+	for (int i=0; i < NUM_LIZARDS; i++) { 		// DG - delete all threads
 		delete allLizards[i];
 	}
 	for (int i=0; i < NUM_CATS; i++) {

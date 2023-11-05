@@ -758,9 +758,9 @@ int main(int argc, char **argv)
 	/*
      * That's it - the end of the world
      */
-	running_mtx.lock(); 		// AB - lock running var
+	running_mtx.lock(); 		// DG - lock running var
 	running = 0;
-	running_mtx.unlock(); 	// AB - unlock running var
+	running_mtx.unlock(); 	// DG - unlock running var
 
     /*
      * Wait until all threads terminate
@@ -780,14 +780,14 @@ int main(int argc, char **argv)
 	/*
      * Delete the locks and semaphores
      */
-	 sem_destroy(&sidewalk_sem); 		// AB - destroy sidewalk semaphore
+	 sem_destroy(&sidewalk_sem); 		// DG - destroy sidewalk semaphore
 
 	 
 	 
 	/*
 	 * Delete all cat and lizard objects
 	 */
-	for (int i=0; i < NUM_LIZARDS; i++) { 		// AB - delete all threads
+	for (int i=0; i < NUM_LIZARDS; i++) { 		// DG - delete all threads
 		delete allLizards[i];
 	}
 	for (int i=0; i < NUM_CATS; i++) {
