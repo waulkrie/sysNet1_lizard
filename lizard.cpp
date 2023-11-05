@@ -235,15 +235,6 @@ void Cat::catThread (Cat *aCat)
 		cout << flush;
     }
 
-	// AB - wait for the world to start
-	aCat->_running_mutex->lock(); 		// AB - lock running var
-	while(running == 0)
-	{
-		aCat->_running_mutex->unlock(); 		// AB - unlock running var
-		usleep(1 * 1000);						// AB - sleep for 1ms
-		aCat->_running_mutex->lock(); 		// AB - lock running var
-	}
-	aCat->_running_mutex->unlock(); 		// AB - unlock running var
 
 	aCat->_running_mutex->lock(); 		// AB - lock running var
 	while(running)
@@ -629,16 +620,6 @@ void Lizard::lizardThread(Lizard *aLizard)
       cout << flush;
     }
 
-	// AB - wait for the world to start
-	aLizard->_running_mutex->lock(); 		// AB - lock running var
-	while(running == 0)
-	{
-		aLizard->_running_mutex->unlock(); 		// AB - unlock running var
-		usleep(1 * 1000);						// AB - sleep for 1ms
-		aLizard->_running_mutex->lock(); 		// AB - lock running var
-	}
-	aLizard->_running_mutex->unlock(); 		// AB - unlock running var
-
 	
 	aLizard->_running_mutex->lock(); 		// AB - lock running var
 	while(running)
@@ -735,6 +716,13 @@ int main(int argc, char **argv)
 	    allCats.push_back(new Cat(i, &sidewalk_sem, &running_mtx, &sago2MonkeyGrass_mtx, &monkeyGrass2Sago_mtx));
     }    
     
+	/*
+     * Now let the world run for a while
+     */
+	running_mtx.lock(); 		// AB - lock running var
+	running = 1;
+	running_mtx.unlock(); 	// AB - unlock running var
+	
 
 	/*
 	 * Run NUM_LIZARDS and NUM_CATS threads
@@ -746,12 +734,6 @@ int main(int argc, char **argv)
         allCats[i]->run();
     }
 
-	/*
-     * Now let the world run for a while
-     */
-	running_mtx.lock(); 		// AB - lock running var
-	running = 1;
-	running_mtx.unlock(); 	// AB - unlock running var
 	sleep( WORLDEND );
 
 
