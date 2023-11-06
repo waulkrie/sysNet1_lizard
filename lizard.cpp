@@ -183,6 +183,7 @@ int Cat::getId()
  {
 	 // wait for the thread to terminate
 	 this->_catThread->join(); 		// AB - wait for the thread
+	 delete this->_catThread; 		// AB - delete the thread
  }
  
  
@@ -338,6 +339,7 @@ int Lizard::getId()
 	 // wait for the thread to terminate
 	if (_aLizard != NULL) {
         _aLizard->join();
+		delete _aLizard;
     } 
  }
  
@@ -413,7 +415,6 @@ void Lizard::sago2MonkeyGrassIsSafe()
  */
 void Lizard::crossSago2MonkeyGrass()
 {
-	int temp;
 	if (debug)
     {
       cout << "[" << _id << "] crossing  sago -> monkey grass" << endl;
@@ -424,11 +425,9 @@ void Lizard::crossSago2MonkeyGrass()
 	 * One more crossing this way
 	 */
 	this->_sago2MonkeyGrass_mtx->lock(); 		// AB - lock 
-	temp = numCrossingSago2MonkeyGrass++;
+	numCrossingSago2MonkeyGrass++;
 	this->_sago2MonkeyGrass_mtx->unlock(); 		// AB - unlock 
 
-	// testing
-	// cout << "S2M Liz: " << temp << endl;
 	/*
      * Check for lizards cross both ways
      */
@@ -546,7 +545,6 @@ void Lizard::monkeyGrass2SagoIsSafe()
  */
 void Lizard::crossMonkeyGrass2Sago()
 {
-	int temp;		// AB - varaible to store num for analysis
 	if (debug)
     {
 		cout << "[" << _id << "] crossing  monkey grass -> sago" << endl;
@@ -557,11 +555,9 @@ void Lizard::crossMonkeyGrass2Sago()
      * One more crossing this way
      */
 	this->_monkeyGrass2Sago_mtx->lock(); 		// AB - lock 
-	temp = numCrossingMonkeyGrass2Sago++;
+	numCrossingMonkeyGrass2Sago++;
 	this->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
 
-	// testing
-	// cout << "M2S Liz: " << temp << endl;		// AB - analysis prints
   
     /*
      * Check for lizards cross both ways
