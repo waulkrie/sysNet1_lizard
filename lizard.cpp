@@ -428,7 +428,7 @@ void Lizard::crossSago2MonkeyGrass()
 	this->_sago2MonkeyGrass_mtx->unlock(); 		// AB - unlock 
 
 	// testing
-	cout << "S2M Liz: " << temp << endl;
+	// cout << "S2M Liz: " << temp << endl;
 	/*
      * Check for lizards cross both ways
      */
@@ -561,7 +561,7 @@ void Lizard::crossMonkeyGrass2Sago()
 	this->_monkeyGrass2Sago_mtx->unlock(); 		// AB - unlock
 
 	// testing
-	cout << "M2S Liz: " << temp << endl;		// AB - analysis prints
+	// cout << "M2S Liz: " << temp << endl;		// AB - analysis prints
   
     /*
      * Check for lizards cross both ways
